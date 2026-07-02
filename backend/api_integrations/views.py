@@ -15,7 +15,10 @@ class SearchPlacesView(APIView):
     def get(self, request):
         query = request.query_params.get('query')
         if not query:
-            return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Query is required', 'results': []}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         location = request.query_params.get('location')
         radius = request.query_params.get('radius', 5000)

@@ -13,6 +13,9 @@ class GooglePlacesService:
     def search_places(query, location=None, radius=5000):
         """Search for places using OpenStreetMap Nominatim API (FREE)"""
         
+        if not query or query.strip() == '':
+            return {'results': [], 'error': 'Query is required'}
+        
         try:
             # Nominatim API - completely free, no key needed
             url = "https://nominatim.openstreetmap.org/search"
@@ -20,26 +23,53 @@ class GooglePlacesService:
             params = {
                 'q': query,
                 'format': 'json',
-                'limit': 10,
+                'limit': 20,
                 'addressdetails': 1,
                 'namedetails': 1,
                 'extratags': 1,
             }
             
-            # Add user agent (required by Nominatim policy)
+            if location:
+                params['viewbox'] = location
+                params['bounded'] = 1
+            
+            # IMPORTANT: OpenStreetMap requires a valid User-Agent
             headers = {
-                'User-Agent': 'Construction-CRM/1.0 (https://constructioncrm.com)'
+                'User-Agent': 'EliteEstatesCRM/1.0 (https://estatestack-crm.vercel.app; support@eliteestates.com)',
+                'Accept': 'application/json',
             }
             
-            response = requests.get(url, params=params, headers=headers)
-            data = response.json()
+            # Add timeout to prevent hanging
+            response = requests.get(
+                url, 
+                params=params, 
+                headers=headers, 
+                timeout=10
+            )
             
             # Log for debugging
-            print(f"OpenStreetMap results for '{query}': {len(data)} found")
+            print(f"OpenStreetMap Status Code: {response.status_code}")
+            print(f"Content-Type: {response.headers.get('content-type', 'unknown')}")
+            
+            if response.status_code != 200:
+                return {
+                    'results': [], 
+                    'error': f'API returned status {response.status_code}'
+                }
+            
+            # Check if response is JSON
+            content_type = response.headers.get('content-type', '')
+            if 'json' not in content_type.lower():
+                return {
+                    'results': [], 
+                    'error': 'API returned HTML instead of JSON. Please check User-Agent.'
+                }
+            
+            data = response.json()
             
             if data and len(data) > 0:
                 results = []
-                for place in data[:10]:
+                for place in data[:20]:
                     # Extract address components
                     address = place.get('address', {})
                     display_name = place.get('display_name', '')
@@ -62,13 +92,19 @@ class GooglePlacesService:
                         'postcode': address.get('postcode') or '',
                     })
                 
+                print(f"OpenStreetMap results for '{query}': {len(results)} found")
                 return {'results': results}
             else:
                 return {'results': [], 'message': 'No places found'}
                 
+        except requests.exceptions.Timeout:
+            return {'results': [], 'error': 'Request timed out'}
+        except requests.exceptions.JSONDecodeError as e:
+            logger.error(f"JSON Decode Error: {str(e)}")
+            return {'results': [], 'error': 'Invalid JSON response from API'}
         except Exception as e:
             logger.error(f"OpenStreetMap search error: {str(e)}")
-            return {'error': str(e), 'results': []}
+            return {'results': [], 'error': str(e)}
     
     @staticmethod
     def get_place_details(place_id):
@@ -85,10 +121,15 @@ class GooglePlacesService:
             }
             
             headers = {
-                'User-Agent': 'Construction-CRM/1.0 (https://constructioncrm.com)'
+                'User-Agent': 'EliteEstatesCRM/1.0 (https://estatestack-crm.vercel.app; support@eliteestates.com)',
+                'Accept': 'application/json',
             }
             
-            response = requests.get(url, params=params, headers=headers)
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            
+            if response.status_code != 200:
+                return {'error': f'API returned status {response.status_code}'}
+            
             data = response.json()
             
             if data:
@@ -142,6 +183,8 @@ class GooglePlacesService:
                 
                 lead.save()
                 logger.info(f"Lead {lead.id} location enriched successfully")
+            else:
+                logger.warning(f"No location data found for {lead.project_location}")
             
         except Exception as e:
             logger.error(f"Location enrichment error: {str(e)}")
@@ -183,6 +226,20 @@ class ConstructionProjectAPIService:
                         'price_per_sqft': 1500,
                         'demand_score': 90,
                         'supply_score': 60
+                    }
+                }
+            },
+            'Mumbai': {
+                'status': 'success',
+                'data': {
+                    'projects_nearby': [
+                        {'name': 'Worli Sea Face', 'type': 'Luxury Residential', 'status': 'Completed'},
+                        {'name': 'BKC Commercial Hub', 'type': 'Commercial', 'status': 'Under Construction'},
+                    ],
+                    'market_trends': {
+                        'price_per_sqft': 12000,
+                        'demand_score': 88,
+                        'supply_score': 50
                     }
                 }
             }

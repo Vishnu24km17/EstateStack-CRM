@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react'
 import {
   Box,
@@ -33,14 +32,16 @@ function Locations() {
       if (!searchTerm) return null
       try {
         const response = await api.get(
-          `/integrations/places/search/?query=${searchTerm}`,
+          `/integrations/places/search/?query=${encodeURIComponent(searchTerm)}`,
         )
+        console.log('API Response:', response.data)
         return response.data
       } catch (err) {
+        console.error('API Error:', err)
         throw err
       }
     },
-    { enabled: !!searchTerm },
+    { enabled: !!searchTerm, retry: false },
   )
 
   const handleSearch = () => {
@@ -61,6 +62,7 @@ function Locations() {
   }
 
   const results = data?.results || []
+  const errorMessage = data?.error || error?.message || ''
 
   return (
     <Box>
@@ -103,6 +105,13 @@ function Locations() {
             Search
           </Button>
         </Box>
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ mt: 1, display: 'block' }}
+        >
+          Powered by OpenStreetMap • Free and open source
+        </Typography>
       </Paper>
 
       {isLoading && (
@@ -111,9 +120,9 @@ function Locations() {
         </Box>
       )}
 
-      {error && (
+      {errorMessage && (
         <Alert severity="error" sx={{ mt: 2 }}>
-          Error searching locations
+          <strong>Error:</strong> {errorMessage}
           <Button
             onClick={() => refetch()}
             sx={{ ml: 2 }}
@@ -125,22 +134,32 @@ function Locations() {
         </Alert>
       )}
 
-      {!searchTerm && !isLoading && !error && (
+      {!searchTerm && !isLoading && !errorMessage && (
         <Paper sx={{ p: 6, textAlign: 'center' }}>
           <MapIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" color="textSecondary">
             Search for places using OpenStreetMap
           </Typography>
-          <Typography variant="caption" color="textSecondary">
-            Free • No API key required • No billing
+          <Typography variant="body2" color="textSecondary">
+            Find locations, get details, and enrich your lead data
+          </Typography>
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ mt: 2, display: 'block' }}
+          >
+            Completely free • No API key required • No billing
           </Typography>
         </Paper>
       )}
 
-      {searchTerm && !isLoading && !error && results.length === 0 && (
+      {searchTerm && !isLoading && !errorMessage && results.length === 0 && (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="body1" color="textSecondary">
             No results found for "{searchTerm}"
+          </Typography>
+          <Typography variant="caption" color="textSecondary">
+            Try a different search term or be more specific
           </Typography>
         </Paper>
       )}
@@ -166,6 +185,7 @@ function Locations() {
                       <Chip label={place.type} size="small" color="primary" />
                     )}
                   </Box>
+
                   <Box display="flex" flexWrap="wrap" gap={1} mt={2}>
                     {place.city && (
                       <Chip
@@ -189,6 +209,7 @@ function Locations() {
                       />
                     )}
                   </Box>
+
                   {place.lat && place.lon && (
                     <Box mt={2}>
                       <Button
@@ -217,4 +238,3 @@ function Locations() {
 }
 
 export default Locations
-
